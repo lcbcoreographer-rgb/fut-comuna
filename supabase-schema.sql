@@ -117,6 +117,7 @@ create table if not exists player_stats (
   assists int not null default 0,
   goal_participations int not null default 0,
   goals_conceded int not null default 0,
+  games_with_goals int not null default 0,
   win_streak int not null default 0,
   max_win_streak int not null default 0,
   unbeaten_streak int not null default 0,

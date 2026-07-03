@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 // Rotas acessíveis sem login
-const PUBLIC_PREFIXES = ['/ranking', '/historico', '/carta', '/perfil', '/login', '/register']
+const PUBLIC_PREFIXES = ['/ranking', '/historico', '/carta', '/perfil', '/login']
 
 function isPublicPath(pathname: string): boolean {
   if (pathname === '/') return true
@@ -29,7 +29,7 @@ export async function proxy(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
   const { pathname } = request.nextUrl
-  const isAuthRoute = pathname.startsWith('/login') || pathname.startsWith('/register')
+  const isAuthRoute = pathname.startsWith('/login')
 
   // Redireciona raiz para ranking (página pública principal)
   if (pathname === '/') {
@@ -45,7 +45,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Já logado tentando acessar login/register → vai para dashboard
+  // Já logado tentando acessar login → vai para dashboard
   if (user && isAuthRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/dashboard'

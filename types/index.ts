@@ -112,6 +112,7 @@ export interface PlayerStats {
   assists: number
   goal_participations: number
   goals_conceded: number
+  games_with_goals: number
   win_streak: number
   max_win_streak: number
   unbeaten_streak: number

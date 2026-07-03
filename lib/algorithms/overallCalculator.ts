@@ -25,6 +25,8 @@ export function calculateOverall(stats: PlayerStats, position: string): OverallR
     goals,
     assists,
     goal_participations,
+    goals_conceded,
+    games_with_goals,
     mvp_count,
     max_win_streak,
   } = stats
@@ -38,59 +40,53 @@ export function calculateOverall(stats: PlayerStats, position: string): OverallR
   const assistsPerGame = assists / games_played
   const participationsPerGame = goal_participations / games_played
   const mvpRate = mvp_count / games_played
+  const concededPerGame = goals_conceded / games_played
+  // % de partidas em que o jogador marcou pelo menos 1 gol
+  const scoringConsistency = games_with_goals / games_played
 
-  // Overall ponderado por posição
+  // Inverso dos gols sofridos: 0 gols/jogo = 99, 4+ gols/jogo = 40
+  const defScore = clamp(99 - (concededPerGame / 4) * 59, 40, 99)
+
   let overall: number
+
   if (position === 'goleiro') {
-    overall = (
-      winRate * 40 +
-      mvpRate * 15 +
-      normalize(games_played, 100) * 0.3 +
-      max_win_streak * 0.5
-    )
-    overall = clamp(normalize(overall, 100))
-  } else if (position === 'zagueiro' || position === 'lateral') {
+    // Goleiro: gols sofridos é o principal + vitórias + regularidade
     overall = clamp(
-      winRate * 35 +
-      goalsPerGame * 8 +
-      assistsPerGame * 12 +
-      participationsPerGame * 10 +
-      mvpRate * 15 +
-      normalize(games_played, 100, 50) * 0.2 +
-      max_win_streak * 0.4 +
-      55
+      defScore * 0.50 +
+      winRate * 30 +
+      normalize(games_played, 100, 50) * 0.15 +
+      mvpRate * 10
+    )
+  } else if (position === 'zagueiro' || position === 'lateral') {
+    // Defensor: poucos gols sofridos (40%) + mais jogos (25%) + gols+assists (20%) + vitórias (15%)
+    overall = clamp(
+      defScore * 0.40 +
+      normalize(games_played, 80, 50) * 0.25 +
+      normalize(goals + assists, 30, 50) * 0.20 +
+      winRate * 15
     )
   } else if (position === 'volante' || position === 'meia') {
     overall = clamp(
-      winRate * 25 +
+      winRate * 20 +
       goalsPerGame * 12 +
       assistsPerGame * 15 +
       participationsPerGame * 13 +
-      mvpRate * 15 +
-      normalize(games_played, 100, 50) * 0.2 +
-      max_win_streak * 0.3 +
+      mvpRate * 10 +
+      normalize(games_played, 80, 50) * 0.15 +
       55
     )
   } else {
-    // atacante / meia_ofensivo
+    // atacante / meia_ofensivo: partidas com gol (40%) + gols totais (35%) + assists (15%) + vitórias (10%)
     overall = clamp(
-      winRate * 20 +
-      goalsPerGame * 18 +
-      assistsPerGame * 12 +
-      participationsPerGame * 12 +
-      mvpRate * 12 +
-      normalize(games_played, 100, 50) * 0.2 +
-      max_win_streak * 0.3 +
-      55
+      scoringConsistency * 40 +
+      normalize(goals, 60, 50) * 0.35 +
+      normalize(assists, 30, 50) * 0.15 +
+      winRate * 10
     )
   }
 
   // Atributos derivados
-  const pac = clamp(
-    normalize(games_played, 80) * 0.5 +
-    (winRate * 30) +
-    40
-  )
+  const pac = clamp(normalize(games_played, 80) * 0.5 + winRate * 30 + 40)
 
   const sho = clamp(
     normalize(goalsPerGame, 1.5) * 0.7 +
@@ -111,7 +107,7 @@ export function calculateOverall(stats: PlayerStats, position: string): OverallR
   )
 
   const def = position === 'goleiro' || position === 'zagueiro' || position === 'lateral'
-    ? clamp(winRate * 40 + normalize(games_played, 80) * 0.3 + 45)
+    ? clamp(defScore * 0.7 + normalize(games_played, 80) * 0.3)
     : clamp(winRate * 20 + normalize(games_played, 80) * 0.2 + 40)
 
   const phy = clamp(normalize(games_played, 100) * 0.7 + winRate * 15 + 40)

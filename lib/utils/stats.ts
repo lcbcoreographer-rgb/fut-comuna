@@ -68,7 +68,7 @@ export async function recalculatePlayerStats(playerId: string) {
   // Gols e assistências
   const { data: goalRows } = await supabase
     .from('goals')
-    .select('id')
+    .select('id, match_id')
     .eq('scorer_id', playerId)
   const { data: assistRows } = await supabase
     .from('goals')
@@ -78,6 +78,7 @@ export async function recalculatePlayerStats(playerId: string) {
   const goals = goalRows?.length ?? 0
   const assists = assistRows?.length ?? 0
   const goal_participations = goals + assists
+  const games_with_goals = new Set(goalRows?.map((g) => g.match_id)).size
 
   // MVP
   const currentYear = new Date().getFullYear()
@@ -98,6 +99,7 @@ export async function recalculatePlayerStats(playerId: string) {
     assists,
     goal_participations,
     goals_conceded,
+    games_with_goals,
     win_streak,
     max_win_streak,
     unbeaten_streak,

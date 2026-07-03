@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -78,13 +77,6 @@ export default function LoginForm() {
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><LogIn className="h-4 w-4 mr-2" />Entrar</>}
           </Button>
         </form>
-
-        <p className="text-center text-sm text-muted-foreground">
-          Não tem conta?{' '}
-          <Link href="/register" className="text-[#00b33c] hover:underline">
-            Registrar
-          </Link>
-        </p>
       </div>
     </motion.div>
   )

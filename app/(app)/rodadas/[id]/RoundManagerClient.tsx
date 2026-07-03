@@ -8,8 +8,9 @@ import { balanceThreeTeams, TEAM_LABEL, TEAM_COLOR_CLASS, TEAM_DOT_CLASS } from 
 import type { ThreeTeams, TeamColor } from '@/lib/algorithms/teamBalance'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
+import FifaCard from '@/components/player/FifaCard'
 import { toast } from 'sonner'
-import { Users, Shuffle, Play, Square, CheckCircle2, Calendar, MapPin, ChevronDown, ChevronUp, Plus, Pencil, Trash2 } from 'lucide-react'
+import { Users, Shuffle, Play, Square, CheckCircle2, Calendar, MapPin, ChevronDown, ChevronUp, Plus, Pencil, Trash2, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -151,8 +152,27 @@ function GoalModal({ state, onClose, onConfirm }: {
   )
 }
 
+// ─── Modal de Carta ───────────────────────────────────────────
+function PlayerCardModal({ player, onClose }: { player: Profile | null; onClose: () => void }) {
+  if (!player) return null
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+        className="relative glass rounded-2xl p-5"
+      >
+        <button onClick={onClose} className="absolute top-3 right-3 text-muted-foreground hover:text-foreground">
+          <X className="h-4 w-4" />
+        </button>
+        <FifaCard profile={player} showShare />
+      </motion.div>
+    </div>
+  )
+}
+
 // ─── Time card no sorteio ─────────────────────────────────────
-function TeamCard({ color, players, ovr }: { color: TeamColor; players: Profile[]; ovr: number }) {
+function TeamCard({ color, players, ovr, onPlayerClick }: { color: TeamColor; players: Profile[]; ovr: number; onPlayerClick: (p: Profile) => void }) {
   const cc = TEAM_COLOR_CLASS[color]
   const dot = TEAM_DOT_CLASS[color]
   return (
@@ -164,7 +184,7 @@ function TeamCard({ color, players, ovr }: { color: TeamColor; players: Profile[
       </div>
       <div className="space-y-1.5">
         {players.map((p) => (
-          <div key={p.id} className="flex items-center gap-1.5">
+          <button key={p.id} onClick={() => onPlayerClick(p)} className="flex items-center gap-1.5 w-full text-left hover:opacity-80 transition-opacity">
             <Avatar className="h-6 w-6">
               <AvatarImage src={p.avatar_url ?? undefined} />
               <AvatarFallback className={`text-[10px] ${cc.split(' ')[0]} bg-white/5`}>{p.full_name?.charAt(0)}</AvatarFallback>
@@ -175,7 +195,7 @@ function TeamCard({ color, players, ovr }: { color: TeamColor; players: Profile[
                 {p.primary_position === 'goleiro' ? '🧤' : POSITION_ABBR[p.primary_position as keyof typeof POSITION_ABBR]}
               </p>
             </div>
-          </div>
+          </button>
         ))}
       </div>
     </div>
@@ -183,7 +203,7 @@ function TeamCard({ color, players, ovr }: { color: TeamColor; players: Profile[
 }
 
 // ─── Card de partida ──────────────────────────────────────────
-function MatchCard({ match, isAdmin, allPlayers, onStart, onEnd, onGoal, goals }: {
+function MatchCard({ match, isAdmin, allPlayers, onStart, onEnd, onGoal, goals, onPlayerClick }: {
   match: any
   isAdmin: boolean
   allPlayers: Profile[]
@@ -191,6 +211,7 @@ function MatchCard({ match, isAdmin, allPlayers, onStart, onEnd, onGoal, goals }
   onEnd: (id: string) => Promise<void>
   onGoal: (matchId: string, team: TeamColor) => void
   goals: Goal[]
+  onPlayerClick: (p: Profile) => void
 }) {
   const [expanded, setExpanded] = useState(false)
 
@@ -313,13 +334,13 @@ function MatchCard({ match, isAdmin, allPlayers, onStart, onEnd, onGoal, goals }
                     <div className={`text-xs font-medium mb-2 ${TEAM_COLOR_CLASS[color].split(' ')[0]}`}>Time {TEAM_LABEL[color]}</div>
                     <div className="space-y-1.5">
                       {ps.map((p) => (
-                        <div key={p.id} className="flex items-center gap-2">
+                        <button key={p.id} onClick={() => onPlayerClick(p)} className="flex items-center gap-2 w-full text-left hover:opacity-80 transition-opacity">
                           <Avatar className="h-6 w-6">
                             <AvatarImage src={p.avatar_url ?? undefined} />
                             <AvatarFallback className="text-[10px] bg-white/5">{p.full_name?.charAt(0)}</AvatarFallback>
                           </Avatar>
                           <p className="text-xs">{p.full_name?.split(' ')[0]}</p>
-                        </div>
+                        </button>
                       ))}
                     </div>
                   </div>
@@ -356,6 +377,7 @@ export default function RoundManagerClient({ round, allPlayers, initialPresence,
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [loadingEdit, setLoadingEdit] = useState(false)
   const [loadingDelete, setLoadingDelete] = useState(false)
+  const [cardPlayer, setCardPlayer] = useState<Profile | null>(null)
   const router = useRouter()
 
   const confirmed = presence.filter((p: any) => p.status === 'confirmed')
@@ -690,8 +712,8 @@ export default function RoundManagerClient({ round, allPlayers, initialPresence,
               const isConfirmed = pres?.status === 'confirmed'
               const isLoading = loadingPresence === player.id
               return (
-                <motion.button key={player.id} onClick={() => isAdmin && togglePlayer(player.id)}
-                  whileTap={{ scale: 0.95 }} disabled={isLoading || !isAdmin}
+                <motion.button key={player.id} onClick={() => isAdmin ? togglePlayer(player.id) : setCardPlayer(player)}
+                  whileTap={{ scale: 0.95 }} disabled={isLoading}
                   className={`relative flex flex-col items-center gap-1.5 p-3 rounded-xl border transition-all duration-200 ${
                     isConfirmed
                       ? 'border-[#16a34a]/50 bg-[#16a34a]/10'
@@ -767,9 +789,9 @@ export default function RoundManagerClient({ round, allPlayers, initialPresence,
           ) : (
             <div className="space-y-3">
               <div className="grid grid-cols-3 gap-2">
-                <TeamCard color="blue" players={drawResult.blue} ovr={drawResult.blueAvg} />
-                <TeamCard color="black" players={drawResult.black} ovr={drawResult.blackAvg} />
-                <TeamCard color="red" players={drawResult.red} ovr={drawResult.redAvg} />
+                <TeamCard color="blue" players={drawResult.blue} ovr={drawResult.blueAvg} onPlayerClick={setCardPlayer} />
+                <TeamCard color="black" players={drawResult.black} ovr={drawResult.blackAvg} onPlayerClick={setCardPlayer} />
+                <TeamCard color="red" players={drawResult.red} ovr={drawResult.redAvg} onPlayerClick={setCardPlayer} />
               </div>
               <p className="text-xs text-center text-muted-foreground">
                 Desequilíbrio máx: <span className="text-[#22c55e]">{drawResult.maxDiff.toFixed(1)} OVR</span>
@@ -829,6 +851,7 @@ export default function RoundManagerClient({ round, allPlayers, initialPresence,
               onEnd={handleEndMatch}
               onGoal={openGoalModal}
               goals={goals}
+              onPlayerClick={setCardPlayer}
             />
           ))}
 
@@ -907,6 +930,9 @@ export default function RoundManagerClient({ round, allPlayers, initialPresence,
         onClose={() => setGoalModal((s) => ({ ...s, open: false }))}
         onConfirm={registerGoal}
       />
+
+      {/* Modal de Carta */}
+      <PlayerCardModal player={cardPlayer} onClose={() => setCardPlayer(null)} />
     </div>
   )
 }
