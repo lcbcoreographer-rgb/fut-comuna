@@ -34,7 +34,7 @@ export default function PlayersClient({ profiles }: Props) {
   const router = useRouter()
 
   const filtered = profiles.filter((p) =>
-    p.full_name.toLowerCase().includes(search.toLowerCase())
+    (p.full_name ?? '').toLowerCase().includes(search.toLowerCase())
   )
 
   function openEdit(player: Profile) {
@@ -112,12 +112,12 @@ export default function PlayersClient({ profiles }: Props) {
             <div key={player.id} className="stat-card p-4 flex items-center gap-4">
               <Avatar className="h-10 w-10 border border-white/10">
                 <AvatarImage src={player.avatar_url ?? undefined} />
-                <AvatarFallback className="bg-[#00b33c]/10 text-[#00b33c]">{player.full_name.charAt(0)}</AvatarFallback>
+                <AvatarFallback className="bg-[#00b33c]/10 text-[#00b33c]">{(player.full_name ?? '?').charAt(0)}</AvatarFallback>
               </Avatar>
 
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <p className="font-semibold truncate">{player.full_name}</p>
+                  <p className="font-semibold truncate">{player.full_name || 'Sem nome'}</p>
                   {player.role === 'admin' && <Badge className="text-[10px] bg-amber-500/10 text-amber-400 border-amber-500/20">Admin</Badge>}
                 </div>
                 <p className="text-xs text-muted-foreground">
