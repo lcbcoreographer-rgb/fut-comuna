@@ -5,7 +5,7 @@
 -- TABELA: profiles
 -- ============================================================
 create table if not exists profiles (
-  id uuid references auth.users on delete cascade primary key,
+  id uuid primary key default gen_random_uuid(),
   full_name text not null,
   avatar_url text,
   shirt_number int,
@@ -221,7 +221,10 @@ alter table notifications enable row level security;
 
 -- Profiles: leitura pública, escrita próprio user ou admin
 create policy "profiles_select" on profiles for select using (true);
-create policy "profiles_insert" on profiles for insert with check (auth.uid() = id);
+create policy "profiles_insert" on profiles for insert with check (
+  auth.uid() = id
+  or exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'admin')
+);
 create policy "profiles_update" on profiles for update using (
   auth.uid() = id or
   exists (select 1 from profiles where id = auth.uid() and role = 'admin')

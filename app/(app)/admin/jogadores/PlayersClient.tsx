@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -10,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { Search, Edit2, RefreshCw } from 'lucide-react'
+import { Search, Edit2, RefreshCw, Plus } from 'lucide-react'
 import { POSITIONS, type Profile, type Position } from '@/types'
 
 const POSITIONS_LIST2 = Object.entries(POSITIONS) as [Position, string][]
@@ -19,12 +20,18 @@ interface Props {
   profiles: (Profile & { player_stats?: any[] })[]
 }
 
+const NEW_PLAYER_DEFAULT = { full_name: '', primary_position: 'atacante' as Position, overall: 60 }
+
 export default function PlayersClient({ profiles }: Props) {
   const [search, setSearch] = useState('')
   const [editingPlayer, setEditingPlayer] = useState<Profile | null>(null)
   const [editForm, setEditForm] = useState({ primary_position: '', overall: 0 })
   const [recalcLoading, setRecalcLoading] = useState<string | null>(null)
+  const [creating, setCreating] = useState(false)
+  const [newPlayer, setNewPlayer] = useState(NEW_PLAYER_DEFAULT)
+  const [saving, setSaving] = useState(false)
   const supabase = createClient()
+  const router = useRouter()
 
   const filtered = profiles.filter((p) =>
     p.full_name.toLowerCase().includes(search.toLowerCase())
@@ -48,6 +55,28 @@ export default function PlayersClient({ profiles }: Props) {
     }
   }
 
+  async function createPlayer() {
+    if (!newPlayer.full_name.trim()) {
+      toast.error('Informe o nome do jogador')
+      return
+    }
+    setSaving(true)
+    const { error } = await supabase.from('profiles').insert({
+      full_name: newPlayer.full_name.trim(),
+      primary_position: newPlayer.primary_position,
+      overall: newPlayer.overall,
+      role: 'player',
+    })
+    setSaving(false)
+    if (error) toast.error('Erro ao criar jogador')
+    else {
+      toast.success('Jogador criado!')
+      setCreating(false)
+      setNewPlayer(NEW_PLAYER_DEFAULT)
+      router.refresh()
+    }
+  }
+
   async function recalculate(playerId: string) {
     setRecalcLoading(playerId)
     await fetch('/api/stats/recalculate', {
@@ -61,14 +90,19 @@ export default function PlayersClient({ profiles }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Buscar jogador..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-9 bg-white/5 border-white/10"
-        />
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar jogador..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9 bg-white/5 border-white/10"
+          />
+        </div>
+        <Button onClick={() => setCreating(true)} className="bg-[#00b33c] text-[#0a0a0f] hover:bg-[#009930] shrink-0">
+          <Plus className="h-4 w-4 mr-1" /> Novo Jogador
+        </Button>
       </div>
 
       <div className="space-y-2">
@@ -147,6 +181,52 @@ export default function PlayersClient({ profiles }: Props) {
             </div>
             <Button onClick={saveEdit} className="w-full bg-[#00b33c] text-[#0a0a0f] hover:bg-[#009930]">
               Salvar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={creating} onOpenChange={(open) => { if (!open) { setCreating(false); setNewPlayer(NEW_PLAYER_DEFAULT) } }}>
+        <DialogContent className="glass border-white/10">
+          <DialogHeader>
+            <DialogTitle>Novo Jogador</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <div className="space-y-2">
+              <label className="text-sm">Nome</label>
+              <Input
+                placeholder="Nome do jogador"
+                value={newPlayer.full_name}
+                onChange={(e) => setNewPlayer({ ...newPlayer, full_name: e.target.value })}
+                className="bg-white/5 border-white/10"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm">Posição principal</label>
+              <Select value={newPlayer.primary_position} onValueChange={(v) => setNewPlayer({ ...newPlayer, primary_position: (v ?? 'atacante') as Position })}>
+                <SelectTrigger className="bg-white/5 border-white/10">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {POSITIONS_LIST2.map(([key, label]) => (
+                    <SelectItem key={key} value={key}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm">Overall inicial</label>
+              <Input
+                type="number"
+                min={40}
+                max={99}
+                value={newPlayer.overall}
+                onChange={(e) => setNewPlayer({ ...newPlayer, overall: parseInt(e.target.value) || 0 })}
+                className="bg-white/5 border-white/10"
+              />
+            </div>
+            <Button onClick={createPlayer} disabled={saving} className="w-full bg-[#00b33c] text-[#0a0a0f] hover:bg-[#009930]">
+              {saving ? 'Criando...' : 'Criar jogador'}
             </Button>
           </div>
         </DialogContent>
