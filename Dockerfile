@@ -13,13 +13,13 @@ COPY . .
 
 # Aceita os nomes que o EasyPanel envia
 ARG SUPABASE_URL
-ARG SUPABASE_SERVICE_KEY
 ARG NEXT_PUBLIC_SUPABASE_URL
 ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-# Mapeia para os nomes que o Next.js precisa
+# Mapeia para os nomes que o Next.js precisa (nunca usar a service_role key aqui:
+# tudo que é NEXT_PUBLIC_ vai para o bundle do navegador)
 ENV NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL:-$SUPABASE_URL}
-ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY:-$SUPABASE_SERVICE_KEY}
+ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
 ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN npm run build
