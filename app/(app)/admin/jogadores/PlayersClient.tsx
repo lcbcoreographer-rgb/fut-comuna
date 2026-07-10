@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { Search, Edit2, RefreshCw, Plus } from 'lucide-react'
-import { POSITIONS, type Profile, type Position } from '@/types'
+import { POSITIONS, CURRENT_SEASON, type Profile, type Position } from '@/types'
 
 const POSITIONS_LIST2 = Object.entries(POSITIONS) as [Position, string][]
 
@@ -25,7 +25,14 @@ const NEW_PLAYER_DEFAULT = { full_name: '', primary_position: 'atacante' as Posi
 export default function PlayersClient({ profiles }: Props) {
   const [search, setSearch] = useState('')
   const [editingPlayer, setEditingPlayer] = useState<Profile | null>(null)
-  const [editForm, setEditForm] = useState({ primary_position: '', overall: 0 })
+  const [editForm, setEditForm] = useState({
+    primary_position: '',
+    overall: 0,
+    games_played: 0,
+    goals: 0,
+    assists: 0,
+    goal_participations: 0,
+  })
   const [recalcLoading, setRecalcLoading] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [newPlayer, setNewPlayer] = useState(NEW_PLAYER_DEFAULT)
@@ -37,21 +44,40 @@ export default function PlayersClient({ profiles }: Props) {
     (p.full_name ?? '').toLowerCase().includes(search.toLowerCase())
   )
 
-  function openEdit(player: Profile) {
+  function openEdit(player: Profile & { player_stats?: any[] }) {
+    const stats = player.player_stats?.[0]
     setEditingPlayer(player)
-    setEditForm({ primary_position: player.primary_position, overall: player.overall })
+    setEditForm({
+      primary_position: player.primary_position,
+      overall: player.overall,
+      games_played: stats?.games_played ?? 0,
+      goals: stats?.goals ?? 0,
+      assists: stats?.assists ?? 0,
+      goal_participations: stats?.goal_participations ?? 0,
+    })
   }
 
   async function saveEdit() {
     if (!editingPlayer) return
-    const { error } = await supabase.from('profiles').update({
+    const { error: profileError } = await supabase.from('profiles').update({
       primary_position: editForm.primary_position || editingPlayer.primary_position,
       overall: editForm.overall,
     }).eq('id', editingPlayer.id)
-    if (error) toast.error('Erro ao salvar')
+
+    const { error: statsError } = await supabase.from('player_stats').upsert({
+      player_id: editingPlayer.id,
+      season: CURRENT_SEASON,
+      games_played: editForm.games_played,
+      goals: editForm.goals,
+      assists: editForm.assists,
+      goal_participations: editForm.goal_participations,
+    }, { onConflict: 'player_id,season' })
+
+    if (profileError || statsError) toast.error('Erro ao salvar')
     else {
       toast.success('Jogador atualizado!')
       setEditingPlayer(null)
+      router.refresh()
     }
   }
 
@@ -178,6 +204,48 @@ export default function PlayersClient({ profiles }: Props) {
                 onChange={(e) => setEditForm({ ...editForm, overall: parseInt(e.target.value) })}
                 className="bg-white/5 border-white/10"
               />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <label className="text-sm">Jogos</label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={editForm.games_played}
+                  onChange={(e) => setEditForm({ ...editForm, games_played: parseInt(e.target.value) || 0 })}
+                  className="bg-white/5 border-white/10"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm">Gols</label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={editForm.goals}
+                  onChange={(e) => setEditForm({ ...editForm, goals: parseInt(e.target.value) || 0 })}
+                  className="bg-white/5 border-white/10"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm">Assistências</label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={editForm.assists}
+                  onChange={(e) => setEditForm({ ...editForm, assists: parseInt(e.target.value) || 0 })}
+                  className="bg-white/5 border-white/10"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm">Participações em gol</label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={editForm.goal_participations}
+                  onChange={(e) => setEditForm({ ...editForm, goal_participations: parseInt(e.target.value) || 0 })}
+                  className="bg-white/5 border-white/10"
+                />
+              </div>
             </div>
             <Button onClick={saveEdit} className="w-full bg-[#00b33c] text-[#0a0a0f] hover:bg-[#009930]">
               Salvar
