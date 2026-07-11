@@ -11,7 +11,7 @@ export type DominantFoot = 'direito' | 'esquerdo' | 'ambos'
 export type UserRole = 'player' | 'admin'
 export type RoundStatus = 'pending' | 'active' | 'finished'
 export type MatchStatus = 'pending' | 'active' | 'finished'
-export type TeamColor = 'blue' | 'black'
+export type TeamColor = 'blue' | 'black' | 'red'
 export type PresenceStatus = 'confirmed' | 'absent' | 'maybe'
 export type MatchEndReason = 'time' | 'goals' | 'manual'
 
@@ -44,6 +44,7 @@ export interface Round {
   status: RoundStatus
   mvp_player_id: string | null
   top_scorer_id: string | null
+  team_compositions: Record<TeamColor, string[]> | null
   created_by: string
   created_at: string
   mvp_player?: Profile
@@ -66,6 +67,7 @@ export interface Match {
   status: MatchStatus
   team_blue_score: number
   team_black_score: number
+  team_red_score: number
   started_at: string | null
   ended_at: string | null
   end_reason: MatchEndReason | null

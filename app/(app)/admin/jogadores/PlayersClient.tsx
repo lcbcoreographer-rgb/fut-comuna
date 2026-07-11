@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { Search, Edit2, RefreshCw, Plus } from 'lucide-react'
+import { Search, Edit2, Plus } from 'lucide-react'
 import { POSITIONS, CURRENT_SEASON, type Profile, type Position } from '@/types'
 
 const POSITIONS_LIST2 = Object.entries(POSITIONS) as [Position, string][]
@@ -33,7 +33,6 @@ export default function PlayersClient({ profiles }: Props) {
     assists: 0,
     goal_participations: 0,
   })
-  const [recalcLoading, setRecalcLoading] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [newPlayer, setNewPlayer] = useState(NEW_PLAYER_DEFAULT)
   const [saving, setSaving] = useState(false)
@@ -103,17 +102,6 @@ export default function PlayersClient({ profiles }: Props) {
     }
   }
 
-  async function recalculate(playerId: string) {
-    setRecalcLoading(playerId)
-    await fetch('/api/stats/recalculate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ playerIds: [playerId] }),
-    })
-    setRecalcLoading(null)
-    toast.success('Stats recalculadas!')
-  }
-
   return (
     <div className="space-y-4">
       <div className="flex gap-2">
@@ -160,11 +148,6 @@ export default function PlayersClient({ profiles }: Props) {
               <div className="flex gap-1">
                 <Button size="icon" variant="ghost" onClick={() => openEdit(player)} className="h-8 w-8 hover:bg-white/5">
                   <Edit2 className="h-3.5 w-3.5" />
-                </Button>
-                <Button size="icon" variant="ghost" onClick={() => recalculate(player.id)}
-                  disabled={recalcLoading === player.id}
-                  className="h-8 w-8 hover:bg-white/5">
-                  <RefreshCw className={`h-3.5 w-3.5 ${recalcLoading === player.id ? 'animate-spin' : ''}`} />
                 </Button>
                 <Link href={`/perfil/${player.id}`}>
                   <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-white/5">→</Button>

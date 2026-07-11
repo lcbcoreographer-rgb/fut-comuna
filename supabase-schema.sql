@@ -36,6 +36,7 @@ create table if not exists rounds (
   status text not null default 'pending' check (status in ('pending', 'active', 'finished')),
   mvp_player_id uuid references profiles(id),
   top_scorer_id uuid references profiles(id),
+  team_compositions jsonb,
   created_by uuid references profiles(id) not null,
   created_at timestamptz not null default now()
 );
@@ -62,6 +63,7 @@ create table if not exists matches (
   status text not null default 'pending' check (status in ('pending', 'active', 'finished')),
   team_blue_score int not null default 0,
   team_black_score int not null default 0,
+  team_red_score int not null default 0,
   started_at timestamptz,
   ended_at timestamptz,
   end_reason text check (end_reason in ('time', 'goals', 'manual')),
@@ -74,7 +76,7 @@ create table if not exists matches (
 create table if not exists teams (
   id uuid primary key default gen_random_uuid(),
   match_id uuid references matches(id) on delete cascade not null,
-  color text not null check (color in ('blue', 'black')),
+  color text not null check (color in ('blue', 'black', 'red')),
   unique(match_id, color)
 );
 
@@ -289,10 +291,12 @@ create policy "goals_delete" on goals for delete using (
   exists (select 1 from profiles where id = auth.uid() and role = 'admin')
 );
 
--- Player stats: leitura pública, update admin ou sistema
+-- Player stats: leitura pública, insert livre (trigger de novo perfil), update só admin
 create policy "player_stats_select" on player_stats for select using (true);
 create policy "player_stats_insert" on player_stats for insert with check (true);
-create policy "player_stats_update" on player_stats for update using (true);
+create policy "player_stats_update" on player_stats for update using (
+  exists (select 1 from profiles where id = auth.uid() and role = 'admin')
+);
 
 -- Achievements: leitura pública
 create policy "achievements_select" on achievements for select using (true);

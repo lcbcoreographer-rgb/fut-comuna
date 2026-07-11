@@ -10,7 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import FifaCard from '@/components/player/FifaCard'
 import { toast } from 'sonner'
-import { Users, Shuffle, Play, Square, CheckCircle2, Calendar, MapPin, ChevronDown, ChevronUp, Plus, Pencil, Trash2, X } from 'lucide-react'
+import { Users, Shuffle, Play, Square, CheckCircle2, Calendar, MapPin, ChevronDown, ChevronUp, Plus, Pencil, Trash2, X, Trophy } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -378,6 +378,9 @@ export default function RoundManagerClient({ round, allPlayers, initialPresence,
   const [loadingEdit, setLoadingEdit] = useState(false)
   const [loadingDelete, setLoadingDelete] = useState(false)
   const [cardPlayer, setCardPlayer] = useState<Profile | null>(null)
+  const [finishOpen, setFinishOpen] = useState(false)
+  const [mvpChoice, setMvpChoice] = useState<string | null>(null)
+  const [loadingFinish, setLoadingFinish] = useState(false)
   const router = useRouter()
 
   const confirmed = presence.filter((p: any) => p.status === 'confirmed')
@@ -409,6 +412,17 @@ export default function RoundManagerClient({ round, allPlayers, initialPresence,
   }
   const lastWinner = getLastWinnerColor()
   const suggestedNext: [TeamColor, TeamColor] | null = lastWinner && waitingColor ? [lastWinner, waitingColor] : null
+
+  const matchIds = matches.map((m) => m.id)
+  const roundGoals = goals.filter((g) => matchIds.includes(g.match_id))
+  const topScorerSuggestion: Profile | null = (() => {
+    const counts = new Map<string, number>()
+    for (const g of roundGoals) counts.set(g.scorer_id, (counts.get(g.scorer_id) ?? 0) + 1)
+    let bestId: string | null = null, best = 0
+    for (const [id, c] of counts) if (c > best) { bestId = id; best = c }
+    return bestId ? allPlayers.find((p) => p.id === bestId) ?? null : null
+  })()
+  const allMatchesDone = matches.length > 0 && !matches.some((m) => m.status !== 'finished')
 
   // Realtime
   useEffect(() => {
@@ -539,9 +553,33 @@ export default function RoundManagerClient({ round, allPlayers, initialPresence,
   }
 
   async function handleEndMatch(matchId: string) {
-    await supabase.from('matches').update({
+    const { error } = await supabase.from('matches').update({
       status: 'finished', ended_at: new Date().toISOString(), end_reason: 'manual',
     }).eq('id', matchId)
+    if (error) { toast.error('Erro ao encerrar partida'); return }
+
+    const res = await fetch('/api/stats/apply-match', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ matchId }),
+    })
+    if (!res.ok) toast.error('Partida encerrada, mas falhou ao atualizar stats dos jogadores')
+  }
+
+  async function handleFinishRound() {
+    setLoadingFinish(true)
+    const res = await fetch('/api/stats/end-round', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roundId: round.id, mvpPlayerId: mvpChoice }),
+    })
+    setLoadingFinish(false)
+    if (!res.ok) { toast.error('Erro ao encerrar rodada'); return }
+    round.status = 'finished'
+    setFinishOpen(false)
+    toast.success('Rodada encerrada! Ranking atualizado.')
+    router.push('/rodadas')
+    router.refresh()
   }
 
   function openGoalModal(matchId: string, team: TeamColor) {
@@ -571,7 +609,8 @@ export default function RoundManagerClient({ round, allPlayers, initialPresence,
     else if (goalModal.team === 'black') updates.team_black_score++
     else updates.team_red_score = (match.team_red_score ?? 0) + 1
 
-    await supabase.from('matches').update(updates).eq('id', goalModal.matchId)
+    const { error: scoreError } = await supabase.from('matches').update(updates).eq('id', goalModal.matchId)
+    if (scoreError) { toast.error('Gol salvo, mas erro ao atualizar placar'); return }
     toast.success('⚽ Gol registrado!')
   }
 
@@ -840,6 +879,13 @@ export default function RoundManagerClient({ round, allPlayers, initialPresence,
             </div>
           )}
 
+          {isAdmin && round.status !== 'finished' && allMatchesDone && (
+            <Button onClick={() => { setMvpChoice(topScorerSuggestion?.id ?? null); setFinishOpen(true) }}
+              className="w-full bg-[#facc15]/10 border border-[#facc15]/30 text-[#facc15] hover:bg-[#facc15]/20 gap-2">
+              <Trophy className="h-4 w-4" /> Encerrar Rodada
+            </Button>
+          )}
+
           {/* Cards das partidas */}
           {matches.map((match) => (
             <MatchCard
@@ -923,6 +969,55 @@ export default function RoundManagerClient({ round, allPlayers, initialPresence,
           )}
         </div>
       )}
+
+      {/* Modal Encerrar Rodada */}
+      <AnimatePresence>
+        {finishOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setFinishOpen(false)} />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+              className="relative glass-strong border border-white/10 rounded-2xl p-6 w-full max-w-sm mx-4 z-10"
+            >
+              <h2 className="font-semibold text-white mb-1 flex items-center gap-2">
+                <Trophy className="h-4 w-4 text-[#facc15]" /> Encerrar Rodada {round.number}
+              </h2>
+              <p className="text-xs text-muted-foreground mb-4">
+                Isso finaliza a rodada e atualiza o ranking.
+                {topScorerSuggestion && <> Artilheiro: <strong className="text-foreground">{topScorerSuggestion.full_name?.split(' ')[0]}</strong>.</>}
+              </p>
+              <label className="text-xs text-muted-foreground mb-1.5 block">MVP da rodada</label>
+              <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto mb-5">
+                <button onClick={() => setMvpChoice(null)}
+                  className={`col-span-3 p-2 rounded-xl border text-xs text-center transition-all ${
+                    mvpChoice === null ? 'border-[#facc15]/50 bg-[#facc15]/10 text-[#facc15]' : 'border-white/10 text-muted-foreground'
+                  }`}>
+                  Sem MVP
+                </button>
+                {confirmedPlayers.map((p) => (
+                  <button key={p.id} onClick={() => setMvpChoice(p.id)}
+                    className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all ${
+                      mvpChoice === p.id ? 'border-[#facc15]/50 bg-[#facc15]/10' : 'border-white/10'
+                    }`}>
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={p.avatar_url ?? undefined} />
+                      <AvatarFallback className="text-xs bg-white/5">{p.full_name?.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <span className="text-[10px] text-center truncate w-full">{p.full_name?.split(' ')[0]}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setFinishOpen(false)} className="flex-1 border-white/10 text-sm">Cancelar</Button>
+                <Button onClick={handleFinishRound} disabled={loadingFinish}
+                  className="flex-1 bg-[#facc15] text-[#0a0a0f] hover:bg-[#eab308]">
+                  {loadingFinish ? 'Encerrando...' : 'Confirmar'}
+                </Button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Modal de Gol */}
       <GoalModal
