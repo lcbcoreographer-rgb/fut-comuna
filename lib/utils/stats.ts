@@ -262,3 +262,24 @@ export async function finishRound(roundId: string, mvpPlayerId: string | null) {
 
   await checkAndAwardAchievements(mvpPlayerId, merged as any)
 }
+
+// Reaplica a fórmula de overall aos números JÁ existentes em player_stats
+// (jogos, gols, assistências, participações, etc — incluindo edições manuais
+// feitas em /admin/jogadores), sem recalcular esses números a partir do
+// histórico de partidas. Não mexe em conquistas nem em mvp_count.
+export async function recalculateAllOverallsFromStats() {
+  const supabase = await createClient()
+  const currentYear = new Date().getFullYear()
+
+  const { data: rows } = await supabase
+    .from('player_stats')
+    .select('*, player:profiles(id, primary_position)')
+    .eq('season', currentYear)
+
+  for (const row of rows ?? []) {
+    const player = (row as any).player
+    if (!player) continue
+    const attrs = calculateOverall(row as any, player.primary_position)
+    await supabase.from('profiles').update(attrs).eq('id', player.id)
+  }
+}

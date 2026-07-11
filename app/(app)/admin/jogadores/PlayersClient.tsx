@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { Search, Edit2, Plus } from 'lucide-react'
+import { Search, Edit2, Plus, RefreshCw } from 'lucide-react'
 import { POSITIONS, CURRENT_SEASON, type Profile, type Position } from '@/types'
 
 const POSITIONS_LIST2 = Object.entries(POSITIONS) as [Position, string][]
@@ -36,6 +36,7 @@ export default function PlayersClient({ profiles }: Props) {
   const [creating, setCreating] = useState(false)
   const [newPlayer, setNewPlayer] = useState(NEW_PLAYER_DEFAULT)
   const [saving, setSaving] = useState(false)
+  const [recalculating, setRecalculating] = useState(false)
   const supabase = createClient()
   const router = useRouter()
 
@@ -80,6 +81,15 @@ export default function PlayersClient({ profiles }: Props) {
     }
   }
 
+  async function recalculateOveralls() {
+    setRecalculating(true)
+    const res = await fetch('/api/stats/recalculate-overall', { method: 'POST' })
+    setRecalculating(false)
+    if (!res.ok) { toast.error('Erro ao recalcular overalls'); return }
+    toast.success('Overalls recalculados!')
+    router.refresh()
+  }
+
   async function createPlayer() {
     if (!newPlayer.full_name.trim()) {
       toast.error('Informe o nome do jogador')
@@ -114,6 +124,10 @@ export default function PlayersClient({ profiles }: Props) {
             className="pl-9 bg-white/5 border-white/10"
           />
         </div>
+        <Button onClick={recalculateOveralls} disabled={recalculating} variant="outline"
+          className="border-white/10 text-muted-foreground hover:text-white shrink-0">
+          <RefreshCw className={`h-4 w-4 mr-1 ${recalculating ? 'animate-spin' : ''}`} /> Recalcular Overalls
+        </Button>
         <Button onClick={() => setCreating(true)} className="bg-[#00b33c] text-[#0a0a0f] hover:bg-[#009930] shrink-0">
           <Plus className="h-4 w-4 mr-1" /> Novo Jogador
         </Button>

@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { createClient } from '@/lib/supabase/client'
 import { POSITIONS, type PlayerStats, CURRENT_SEASON } from '@/types'
+import { ChevronDown, ChevronUp, Info } from 'lucide-react'
 
 type StatsWithPlayer = PlayerStats & { player: any }
 
@@ -23,6 +24,7 @@ interface Props {
 
 export default function RankingClient({ initialStats }: Props) {
   const [stats, setStats] = useState(initialStats)
+  const [howOpen, setHowOpen] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
@@ -41,7 +43,58 @@ export default function RankingClient({ initialStats }: Props) {
   }, [])
 
   return (
-    <Tabs defaultValue="goals">
+    <>
+      <div className="glass rounded-2xl mb-4 overflow-hidden border border-white/8">
+        <button
+          onClick={() => setHowOpen((o) => !o)}
+          className="w-full flex items-center justify-between px-4 py-3 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <span className="flex items-center gap-2">
+            <Info className="h-4 w-4" /> Como o Overall (OVR) é calculado
+          </span>
+          {howOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </button>
+        <AnimatePresence>
+          {howOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="px-4 pb-4 text-sm text-muted-foreground space-y-3">
+                <p>
+                  O overall combina dois fatores: <strong className="text-foreground">quantos jogos</strong> o jogador tem, e a{' '}
+                  <strong className="text-foreground">média real</strong> de desempenho nesses jogos.
+                </p>
+                <div>
+                  <p className="text-foreground font-medium mb-1">1. Jogos disputados (regularidade)</p>
+                  <p>
+                    Com menos de 10 jogos, o overall fica preso perto de um valor baixo, mesmo que a média esteja ótima —
+                    é preciso confirmar a média em jogos de verdade, não só ter sorte em 1 ou 2 partidas. A partir de 10
+                    jogos, a nota passa a valer 100% do que a média indica.
+                  </p>
+                </div>
+                <div>
+                  <p className="text-foreground font-medium mb-1">2. Média por jogo (o que define a nota)</p>
+                  <p>
+                    <strong className="text-foreground">Goleiro e zagueiro</strong> → média de gols sofridos por jogo (quanto menos, melhor):
+                    menos de 1/jogo → até 95 · menos de 1,5 → até 90 · menos de 2 → até 85 · acima disso, cai gradualmente.
+                  </p>
+                  <p className="mt-1">
+                    <strong className="text-foreground">Lateral, volante, meia, meia ofensivo e atacante</strong> → média de gols feitos por jogo:
+                    mais de 5/jogo → 95 · mais de 4 → 90 · mais de 3 → 85 · abaixo de 3, escala proporcionalmente entre 40 e 85.
+                  </p>
+                </div>
+                <p>
+                  Os dois fatores se multiplicam: um jogador com média excelente mas poucos jogos ainda fica com overall
+                  baixo, e só sobe conforme confirma aquela média com mais partidas.
+                </p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      <Tabs defaultValue="goals">
       <TabsList className="glass border-white/8 p-1 h-auto flex flex-wrap gap-1 mb-4">
         {CATEGORIES.map((cat) => (
           <TabsTrigger key={cat.key} value={cat.key} className="text-xs data-[state=active]:bg-[#00b33c]/20 data-[state=active]:text-[#00b33c]">
@@ -94,6 +147,7 @@ export default function RankingClient({ initialStats }: Props) {
           </TabsContent>
         )
       })}
-    </Tabs>
+      </Tabs>
+    </>
   )
 }

@@ -26,9 +26,7 @@ export function calculateOverall(stats: PlayerStats, position: string): OverallR
     assists,
     goal_participations,
     goals_conceded,
-    games_with_goals,
     mvp_count,
-    max_win_streak,
   } = stats
 
   if (games_played === 0) {
@@ -36,54 +34,47 @@ export function calculateOverall(stats: PlayerStats, position: string): OverallR
   }
 
   const winRate = wins / games_played
-  const goalsPerGame = goals / games_played
-  const assistsPerGame = assists / games_played
-  const participationsPerGame = goal_participations / games_played
   const mvpRate = mvp_count / games_played
   const concededPerGame = goals_conceded / games_played
-  // % de partidas em que o jogador marcou pelo menos 1 gol
-  const scoringConsistency = games_with_goals / games_played
+
+  // "Jogos virtuais" de regularização: sem isso, 1 gol em 1 jogo já é 100% de
+  // aproveitamento e satura a nota. Ao somar K jogos vazios no denominador, a
+  // média só se aproxima do valor real conforme mais jogos são disputados —
+  // ou seja, sustentar uma média alta fica mais difícil (e mais valioso)
+  // quanto mais jogos o jogador tiver.
+  const K = 8
+  const goalsPerGame = goals / (games_played + K)
+  const assistsPerGame = assists / (games_played + K)
+  const participationsPerGame = goal_participations / (games_played + K)
 
   // Inverso dos gols sofridos: 0 gols/jogo = 99, 4+ gols/jogo = 40
   const defScore = clamp(99 - (concededPerGame / 4) * 59, 40, 99)
 
-  let overall: number
+  // Multiplicador de regularidade: com poucos jogos o overall fica preso perto
+  // da base (40), mesmo que a média seja ótima. Só aos 10 jogos o desempenho
+  // real passa a valer 100% — precisa sustentar a média, não só ter sorte
+  // em 1-2 partidas.
+  const gamesMultiplier = Math.min(1, games_played / 10)
 
-  if (position === 'goleiro') {
-    // Goleiro: gols sofridos é o principal + vitórias + regularidade
-    overall = clamp(
-      defScore * 0.50 +
-      winRate * 30 +
-      normalize(games_played, 100, 50) * 0.15 +
-      mvpRate * 10
-    )
-  } else if (position === 'zagueiro' || position === 'lateral') {
-    // Defensor: poucos gols sofridos (40%) + mais jogos (25%) + gols+assists (20%) + vitórias (15%)
-    overall = clamp(
-      defScore * 0.40 +
-      normalize(games_played, 80, 50) * 0.25 +
-      normalize(goals + assists, 30, 50) * 0.20 +
-      winRate * 15
-    )
-  } else if (position === 'volante' || position === 'meia') {
-    overall = clamp(
-      winRate * 20 +
-      goalsPerGame * 12 +
-      assistsPerGame * 15 +
-      participationsPerGame * 13 +
-      mvpRate * 10 +
-      normalize(games_played, 80, 50) * 0.15 +
-      55
-    )
+  // Goleiro e zagueiro são avaliados pela média de gols sofridos (menos = melhor);
+  // as demais posições, pela média real de gols feitos por jogo.
+  const isDefensive = position === 'goleiro' || position === 'zagueiro'
+  const realGoalsPerGame = goals / games_played
+
+  let tierScore: number
+  if (isDefensive) {
+    if (concededPerGame < 1) tierScore = 95
+    else if (concededPerGame < 1.5) tierScore = 90
+    else if (concededPerGame < 2) tierScore = 85
+    else tierScore = clamp(85 - (concededPerGame - 2) * 15, 40, 85)
   } else {
-    // atacante / meia_ofensivo: partidas com gol (40%) + gols totais (35%) + assists (15%) + vitórias (10%)
-    overall = clamp(
-      scoringConsistency * 40 +
-      normalize(goals, 60, 50) * 0.35 +
-      normalize(assists, 30, 50) * 0.15 +
-      winRate * 10
-    )
+    if (realGoalsPerGame > 5) tierScore = 95
+    else if (realGoalsPerGame > 4) tierScore = 90
+    else if (realGoalsPerGame > 3) tierScore = 85
+    else tierScore = 40 + (realGoalsPerGame / 3) * 45
   }
+
+  const overall = clamp(40 + (tierScore - 40) * gamesMultiplier)
 
   // Atributos derivados
   const pac = clamp(normalize(games_played, 80) * 0.5 + winRate * 30 + 40)
